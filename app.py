@@ -26,6 +26,9 @@ DEF = {
     "eur_km": 0.26,        # coste por km de furgoneta
     "beneficio": 40.0,     # % de beneficio
     "iva": 10.0,
+    "sueldo_admin": 1700.0,  # salario líquido mensual del administrativo
+    "pct_admin": 80.0,       # % de ese salario que se imputa a instalaciones
+    "inst_mes": 20,          # instalaciones al mes para repartir la gestión
     "origen": "Bétera, Valencia",
 }
 
@@ -170,6 +173,17 @@ with st.sidebar:
               "de la base imponible. 21 %: empresas, locales o comunidades."),
     )
 
+    st.subheader("Gestión administrativa")
+    sueldo_admin = st.number_input("Salario líquido administrativo (€/mes)", 0.0,
+                                   value=DEF["sueldo_admin"], step=50.0, format="%.2f")
+    pct_admin = st.number_input("Parte imputada a instalaciones (%)", 0.0, 100.0,
+                                value=DEF["pct_admin"], step=5.0)
+    inst_mes = st.number_input("Instalaciones al mes", min_value=1, value=DEF["inst_mes"], step=1,
+                               help="El coste de gestión del mes se reparte entre estas instalaciones.")
+    eur_gestion = sueldo_admin * pct_admin / 100 / inst_mes
+    st.caption(f"Gestión por instalación: **{eur(eur_gestion)}** "
+               f"({eur(sueldo_admin * pct_admin / 100)} al mes / {inst_mes})")
+
     st.subheader("Salida")
     origen = st.text_input("Punto de salida", value=DEF["origen"])
 
@@ -276,7 +290,8 @@ c_material = c_material_ml + c_material_tramo
 c_mo_obra = horas_inst * eur_h
 c_mo_viaje = horas_viaje * eur_h
 c_km = km_total * eur_km
-coste = c_material + c_mo_obra + c_mo_viaje + c_km
+c_gestion = eur_gestion
+coste = c_material + c_mo_obra + c_mo_viaje + c_km + c_gestion
 
 if modo_beneficio == "Sobre el coste":
     precio = coste * (1 + beneficio / 100)
@@ -314,7 +329,7 @@ if supera_40:
     )
 
 k1, k2, k3 = st.columns(3)
-k1.metric("Coste directo", eur(coste))
+k1.metric("Coste total", eur(coste))
 k2.metric("Beneficio", eur(ganancia), f"{num(ganancia / precio * 100 if precio else 0, 1)} % del precio",
           delta_color="off")
 k3.metric("Precio por metro", eur(precio / metros) if metros else "—", "sin IVA", delta_color="off")
@@ -325,10 +340,11 @@ filas = [
     ("Horas en obra (pareja)", f"{num(horas_inst)} h × {eur(eur_h)}", c_mo_obra),
     ("Horas de viaje (pareja)", f"{num(horas_viaje, 2)} h × {eur(eur_h)}", c_mo_viaje),
     ("Kilometraje", f"{num(km_total)} km × {eur(eur_km)}", c_km),
+    ("Gestión administrativa", f"{num(pct_admin, 0)} % de {eur(sueldo_admin)} / {inst_mes} inst.", c_gestion),
 ]
 tabla = "| Partida | Cálculo | Importe |\n|---|---|---:|\n"
 tabla += "\n".join(f"| {a} | {b} | {eur(c)} |" for a, b, c in filas)
-tabla += f"\n| **Coste directo** | | **{eur(coste)}** |"
+tabla += f"\n| **Coste total** | | **{eur(coste)}** |"
 tabla += f"\n| Beneficio | {num(beneficio, 0)} % {modo_beneficio.lower()} | {eur(ganancia)} |"
 tabla += f"\n| **Precio sin IVA** | | **{eur(precio)}** |"
 tabla += f"\n| IVA | {num(iva, 0)} % | {eur(cuota_iva)} |"
@@ -353,7 +369,8 @@ resumen = "\n".join(
         f"Material: {eur(c_material)}",
         f"Mano de obra: {eur(c_mo_obra + c_mo_viaje)}",
         f"Kilometraje: {eur(c_km)}",
-        f"Coste directo: {eur(coste)}",
+        f"Gestión administrativa: {eur(c_gestion)}",
+        f"Coste total: {eur(coste)}",
         f"Beneficio ({num(beneficio, 0)} % {modo_beneficio.lower()}): {eur(ganancia)}",
         "",
         f"Precio sin IVA: {eur(precio)}",
