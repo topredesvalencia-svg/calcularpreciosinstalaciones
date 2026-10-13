@@ -25,7 +25,7 @@ DEF = {
     "eur_h_pareja": 46.41, # coste hora de la pareja (2 operarios)
     "eur_km": 0.26,        # coste por km de furgoneta
     "beneficio": 40.0,     # % de beneficio
-    "iva": 21.0,
+    "iva": 10.0,
     "origen": "Bétera, Valencia",
 }
 
@@ -164,7 +164,11 @@ with st.sidebar:
     eur_h = st.number_input("Hora de pareja (€/h)", 0.0, value=DEF["eur_h_pareja"], step=0.50, format="%.2f",
                             help="2 operarios, base 1.833,26 € + SS empresa, con un 25 % de tiempo no imputable.")
     eur_km = st.number_input("Coste por km (€/km)", 0.0, value=DEF["eur_km"], step=0.01, format="%.2f")
-    iva = st.number_input("IVA (%)", 0.0, 100.0, value=DEF["iva"], step=1.0)
+    iva = st.number_input(
+        "IVA (%)", 0.0, 100.0, value=DEF["iva"], step=1.0,
+        help=("10 %: obras en vivienda de un particular, si el material no supera el 40 % "
+              "de la base imponible. 21 %: empresas, locales o comunidades."),
+    )
 
     st.subheader("Salida")
     origen = st.text_input("Punto de salida", value=DEF["origen"])
@@ -283,6 +287,7 @@ else:
     precio = coste / (1 - beneficio / 100)
 
 ganancia = precio - coste
+supera_40 = iva == 10 and precio > 0 and c_material / precio > 0.40
 cuota_iva = precio * iva / 100
 total = precio + cuota_iva
 
@@ -301,6 +306,12 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+if supera_40:
+    st.warning(
+        f"El material supone el {num(c_material / precio * 100, 0)} % del precio sin IVA. "
+        "Con más del 40 % no se puede aplicar el IVA del 10 %: cambia el IVA al 21 %."
+    )
 
 k1, k2, k3 = st.columns(3)
 k1.metric("Coste directo", eur(coste))
